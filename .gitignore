@@ -1,0 +1,11 @@
+# Old prototype copies (ported into src/engine)
+awef/
+Archive/
+
+# Dependencies
+node_modules/
+
+# Design docs
+*.pdf
+
+.DS_Store
