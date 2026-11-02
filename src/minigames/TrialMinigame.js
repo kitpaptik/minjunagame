@@ -31,7 +31,7 @@ export default class TrialMinigame extends BaseMinigame {
         this.judge = this.config.judge ?? '판사';
         this.questions = this.config.questions ?? [];
         this.lives = this.config.lives ?? 3;
-        this.seconds = (this.config.secondsPerQuestion ?? 12) * this.byDifficulty({ easy: 1.4, normal: 1, hard: 0.7 });
+        this.seconds = this.shorter((this.config.secondsPerQuestion ?? 12) * this.byDifficulty({ easy: 1.4, normal: 1, hard: 0.7 }));
         this.index = -1;
         this.answered = null;
         this.buttons = [];

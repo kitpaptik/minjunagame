@@ -2,6 +2,9 @@ import { createApi } from '../engine/createApi.js';
 import Button from '../ui/Button.js';
 import { COLORS, textStyle } from '../ui/theme.js';
 
+/** How much harder minigames get at Depression 100% (0.4 = 40% less time / 40% faster). */
+const GLOOM_STRENGTH = 0.4;
+
 /**
  * Base class for every minigame scene.
  *
@@ -13,16 +16,21 @@ import { COLORS, textStyle } from '../ui/theme.js';
  *   startGame() -> begins play after the intro screen
  *
  * `this.api` gives physics-style minigames the QuickEngine helpers (spawn, rules, input, ...).
+ *
+ * Depression makes every minigame harder: `this.gloom` is 0 (Depression 0%) .. 1 (100%),
+ * and subclasses run their tuning numbers through shorter() / faster().
  */
 export default class BaseMinigame extends Phaser.Scene {
     init(data) {
         this.config = data?.config ?? {};
         this.difficulty = this.registry.get('difficulty') ?? 'normal';
+        this.gloom = Phaser.Math.Clamp((this.registry.get('depression') ?? 0) / 100, 0, 1);
         this.finished = false;
     }
 
     create() {
         this.api = createApi(this, this);
+        this.#addGloomOverlay();
         this.showIntro();
     }
 
@@ -35,6 +43,29 @@ export default class BaseMinigame extends Phaser.Scene {
         return values[this.difficulty] ?? values.normal;
     }
 
+    /** Time limits and reaction windows shrink with Depression (up to -strength at 100%). */
+    shorter(value, strength = GLOOM_STRENGTH) {
+        return value * (1 - this.gloom * strength);
+    }
+
+    /** Speeds and opponent skill grow with Depression (up to +strength at 100%). */
+    faster(value, strength = GLOOM_STRENGTH) {
+        return value * (1 + this.gloom * strength);
+    }
+
+    /** Darkens the screen the more depressed Minjun is, so the extra difficulty is visible. */
+    #addGloomOverlay() {
+        if (this.gloom < 0.2) return;
+        const { width, height } = this.scale;
+        this.add.rectangle(width / 2, height / 2, width, height, 0x0a0a14, this.gloom * 0.35).setDepth(900);
+    }
+
+    #gloomNote() {
+        if (this.gloom < 0.2) return '';
+        const percent = Math.round(this.gloom * GLOOM_STRENGTH * 100);
+        return `\n\nDepression ${Math.round(this.gloom * 100)}% - 집중이 잘 안 된다... (난이도 +${percent}%)`;
+    }
+
     showIntro() {
         const { width, height } = this.scale;
         const { title, howTo } = this.info;
@@ -42,7 +73,8 @@ export default class BaseMinigame extends Phaser.Scene {
         intro.add([
             this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.85),
             this.add.text(width / 2, height * 0.3, title, textStyle(56, { fontStyle: 'bold', color: COLORS.gold })).setOrigin(0.5),
-            this.add.text(width / 2, height * 0.48, howTo, textStyle(26, { align: 'center', lineSpacing: 10 })).setOrigin(0.5),
+            this.add.text(width / 2, height * 0.48, howTo + this.#gloomNote(), textStyle(26, { align: 'center', lineSpacing: 10 }))
+                .setOrigin(0.5),
         ]);
         const start = () => {
             intro.destroy(true);
@@ -63,7 +95,8 @@ export default class BaseMinigame extends Phaser.Scene {
 
     /**
      * Ends the minigame, shows the result, then hands control back to the story.
-     * result: { success, score?, label? } - label overrides the default 성공!/실패... banner.
+     * result: { success, score?, label?, add? } - label overrides the default 성공!/실패... banner,
+     * add ({ gpa: 0.2 }) is applied to the stats by the story once it wakes up.
      */
     finish(result) {
         if (this.finished) return;

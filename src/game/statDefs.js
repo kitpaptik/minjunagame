@@ -13,7 +13,7 @@ export const STAT_DEFS = {
     },
     aura: { label: 'Aura', min: -100, max: 100, goodWhen: 'up', format: (v) => `${Math.round(v)}` },
     turtleNeck: { label: '거북목', min: 0, max: 100, goodWhen: 'down', format: (v) => `${Math.round(v)}/100` },
-    depression: { label: 'Depression', min: 0, max: 100, goodWhen: 'down', format: (v) => `${Math.round(v)}` },
+    depression: { label: 'Depression', min: 0, max: 100, goodWhen: 'down', unit: '%', format: (v) => `${Math.round(v)}%` },
     gpa: { label: 'GPA', min: 0, max: 4, goodWhen: 'up', format: (v) => (v == null ? '-' : v.toFixed(1)) },
 };
 
@@ -41,7 +41,7 @@ export const DIFFICULTIES = {
 /** What one point does on the stat upgrade screen (spec: 스텟 강화가능: Aura, Depression, 한화, 거북목). */
 export const UPGRADE_OPTIONS = [
     { key: 'aura', amount: 10, text: 'Aura +10' },
-    { key: 'depression', amount: -10, text: 'Depression -10' },
+    { key: 'depression', amount: -10, text: 'Depression -10%' },
     { key: 'hanwha', amount: 1000, text: '한화 +1,000' },
     { key: 'turtleNeck', amount: -10, text: '거북목 -10' },
 ];

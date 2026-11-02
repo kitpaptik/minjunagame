@@ -76,7 +76,7 @@ export default class RunnerMinigame extends BaseMinigame {
         const dt = Math.min(deltaMs, 50) / 1000;
         this.elapsed += deltaMs;
         const progress = Math.min(1, this.elapsed / this.duration);
-        const speed = 420 + 480 * progress;
+        const speed = this.faster(420 + 480 * progress);
 
         this.distance += speed * dt / 40;
         this.distanceText.setText(`${Math.floor(this.distance)} m`);
@@ -114,7 +114,7 @@ export default class RunnerMinigame extends BaseMinigame {
 
     #scheduleSpawn() {
         const progress = Math.min(1, this.elapsed / this.duration);
-        const delay = Phaser.Math.Linear(950, 480, progress);
+        const delay = this.shorter(Phaser.Math.Linear(950, 480, progress));
         this.spawnTimer = this.time.delayedCall(delay, () => {
             if (!this.playing || this.finalWave) return;
             this.#spawnRow(progress > 0.4 && Math.random() < 0.45 ? 2 : 1);

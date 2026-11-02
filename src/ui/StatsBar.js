@@ -44,7 +44,7 @@ export default class StatsBar extends Phaser.GameObjects.Container {
         const anchor = this.valueTexts[key];
         const sign = delta > 0 ? '+' : '';
         const amount = key === 'hanwha' ? Math.round(delta).toLocaleString('ko-KR') : Math.round(delta * 10) / 10;
-        const popup = this.scene.add.text(anchor.x + 20, anchor.y + 22, `${sign}${amount}`, textStyle(22, {
+        const popup = this.scene.add.text(anchor.x + 20, anchor.y + 22, `${sign}${amount}${STAT_DEFS[key].unit ?? ''}`, textStyle(22, {
             fontStyle: 'bold',
             color: isGoodChange(key, delta) ? COLORS.good : COLORS.bad,
             stroke: '#000000',

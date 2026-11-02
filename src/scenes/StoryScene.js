@@ -14,7 +14,7 @@ const STOP = Symbol('stop');
 const DEFAULT_PLACE = { name: '', bg: '#2b3a55' };
 
 /**
- * Runs chapter scripts from src/game/story (step format: src/game/story/README.md).
+ * Runs chapter scripts from /story (parsed into steps by src/engine/StoryScript.js).
  * Autosaves before every top-level step so "이어하기" resumes exactly there.
  */
 export default class StoryScene extends Phaser.Scene {
@@ -43,7 +43,7 @@ export default class StoryScene extends Phaser.Scene {
         this.#bindInput();
 
         if (!this.chapter) {
-            this.#showError(`챕터 "${this.chapterId}"가 src/game/story/index.js에 없습니다.`);
+            this.#showError(`챕터 "${this.chapterId}"가 story/chapters.txt에 없습니다.`);
             return;
         }
         this.#run(this.startNode ?? this.chapter.start, this.startIndex);
@@ -286,6 +286,7 @@ export default class StoryScene extends Phaser.Scene {
             this.scene.sleep();
         });
 
+        if (result.add) this.stats.apply({ add: result.add });
         const death = this.stats.deathEnding();
         if (death) return this.#ending(death);
         return (result.success ? step.win : step.lose) ?? undefined;

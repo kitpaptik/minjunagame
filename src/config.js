@@ -11,7 +11,6 @@ export const SETTINGS = {
     gravity: 600,
     debugPhysics: false,
     backgroundColor: '#14141f',
-    firstChapter: 'prologue',
     /** Milliseconds per character for the dialogue typewriter effect. */
     textSpeed: 28,
 };

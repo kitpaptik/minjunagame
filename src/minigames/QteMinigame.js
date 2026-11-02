@@ -32,7 +32,7 @@ export default class QteMinigame extends BaseMinigame {
 
         this.rounds = this.config.rounds ?? 6;
         this.required = this.config.required ?? Math.ceil(this.rounds * 0.66);
-        this.windowMs = this.byDifficulty({ easy: 1700, normal: 1250, hard: 900 });
+        this.windowMs = this.shorter(this.byDifficulty({ easy: 1700, normal: 1250, hard: 900 }));
         this.round = 0;
         this.hits = 0;
 

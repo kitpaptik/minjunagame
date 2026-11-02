@@ -2,6 +2,7 @@ import { SETTINGS } from '../config.js';
 import SaveManager from '../engine/SaveManager.js';
 import Stats from '../game/Stats.js';
 import { DIFFICULTIES } from '../game/statDefs.js';
+import { chapterOrder } from '../game/story/index.js';
 import Button from '../ui/Button.js';
 import { COLORS, textStyle } from '../ui/theme.js';
 
@@ -57,7 +58,7 @@ export default class TitleScene extends Phaser.Scene {
         SaveManager.clear();
         this.registry.set('difficulty', difficulty);
         new Stats(this).load(DIFFICULTIES[difficulty].stats);
-        this.scene.start('Story', { chapterId: SETTINGS.firstChapter });
+        this.scene.start('Story', { chapterId: chapterOrder[0] });
     }
 
     #continue(save) {

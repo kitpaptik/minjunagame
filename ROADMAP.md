@@ -17,7 +17,9 @@ electron/                         데스크톱 창 (app:// 프로토콜, F11 전
 src/config.js                     해상도, 폰트, 텍스트 속도
 src/scenes/                       Boot → Preload → Title → Story ⇄ 미니게임 → ChapterEnd / Ending
 src/game/statDefs.js              스탯 정의, 난이도, 강화 옵션, 사망 조건(거북목 100)
-src/game/story/                   챕터 스크립트 (작성법: src/game/story/README.md)
+story/                            대본 (.txt, 작성법: story/README.md) ← 대사는 여기서 고친다
+src/engine/StoryScript.js         대본 해석기 (.txt → 스텝)
+src/game/scriptWords.js           대본에서 쓰는 단어 (스탯/미니게임 별명)
 src/game/endings.js               엔딩 목록
 src/minigames/                    BaseMinigame + 각 미니게임 (index.js에 등록)
 src/ui/                           Button, DialogueBox, StatsBar
@@ -31,6 +33,10 @@ src/engine/                       에셋 로더(실패 시 대체 텍스처), �
 - [x] 스토리 엔진: 대사, 선택지(안 눌리는 버튼, Aura 조건, 한화 비용), 스탯 강화, CG, 미니게임 연결
 - [x] Prologue (7학년 Day 1~2)
 - [x] Chapter 1 (8학년): 돌발 QTE, 1.1 배드민턴(입단 → 김우찬 조작판 → KISAC), 1.2 Osaka 재판, 1.3 졸업 러너 → 교통사고
+- [x] 대본 언어: story/*.txt 한국어 문장 형식 (story/README.md)
+- [x] Depression %: 높을수록 모든 미니게임 난이도 상승 (최대 +40%)
+- [x] 시험 시스템: formative / summative, 미니게임 12종 (aging-curve 참고), IB 1~7등급 → GPA
+- [x] 배드민턴 3D 원근 코트, 3판 2선승, 스매시/드롭/클리어, 아웃/네트
 
 ## 다음 할 일
 
