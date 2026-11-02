@@ -63,44 +63,6 @@ export class AimTask extends ExamTask {
     }
 }
 
-/** 파리 잡기 - keep the cursor on a wandering fly. Score is the share of time on target. */
-export class FlyTask extends ExamTask {
-    static key = 'fly';
-    static title = '파리 잡기';
-    static howTo = '파리 위에 마우스 커서를 계속 올려두세요.\n12초 동안 파리 위에 머문 비율로 채점해요.';
-
-    start() {
-        this.duration = 12000;
-        this.elapsed = 0;
-        this.onTarget = 0;
-        this.seed = Math.random() * 1000;
-        this.radius = 38;
-        this.zone = this.add(this.scene.add.circle(AREA.cx, AREA.cy, this.radius, 0xffffff, 0.12).setStrokeStyle(2, 0xffffff, 0.5));
-        this.fly = this.add(this.scene.add.text(AREA.cx, AREA.cy, '🪰', { fontSize: '40px' }).setOrigin(0.5));
-        this.percent = this.text(AREA.cx, AREA.bottom - 10, '', 24, { color: COLORS.muted });
-    }
-
-    update(dt) {
-        this.elapsed += dt * 1000;
-        const progress = this.elapsed / this.duration;
-        const e = (this.elapsed / 1000) * this.scene.faster(0.9 * (1 + progress * 0.6)) + this.seed;
-        const x = AREA.cx + Math.sin(e * 1.3) * 430 + Math.sin(e * 3.1 + 1) * 110 + Math.sin(e * 5.7) * 25;
-        const y = AREA.cy + Math.sin(e * 1.7 + 2) * 160 + Math.sin(e * 2.9) * 60 + Math.cos(e * 6.3) * 18;
-        this.fly.setPosition(x, y);
-        this.zone.setPosition(x, y);
-
-        const p = this.scene.input.activePointer;
-        const on = Phaser.Math.Distance.Between(p.x, p.y, x, y) <= this.radius;
-        if (on) this.onTarget += dt * 1000;
-        this.zone.setFillStyle(on ? 0x2ecc71 : 0xffffff, on ? 0.35 : 0.12);
-
-        const pct = Math.round((this.onTarget / this.elapsed) * 100);
-        this.percent.setText(`파리 위 ${pct}%`);
-        this.hud(`${Math.max(0, (this.duration - this.elapsed) / 1000).toFixed(1)}초`);
-        if (this.elapsed >= this.duration) this.done(scale(pct, 15, 85), `파리 위 ${pct}%`);
-    }
-}
-
 /** 볼 피하기 - dodge balls flying in from the edges for up to 20 seconds. One hit ends it. */
 export class DodgeTask extends ExamTask {
     static key = 'dodge';

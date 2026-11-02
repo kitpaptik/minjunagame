@@ -35,7 +35,7 @@ src/engine/                       에셋 로더(실패 시 대체 텍스처), �
 - [x] Chapter 1 (8학년): 돌발 QTE, 1.1 배드민턴(입단 → 김우찬 조작판 → KISAC), 1.2 Osaka 재판, 1.3 졸업 러너 → 교통사고
 - [x] 대본 언어: story/*.txt 한국어 문장 형식 (story/README.md)
 - [x] Depression %: 높을수록 모든 미니게임 난이도 상승 (최대 +40%)
-- [x] 시험 시스템: formative / summative, 미니게임 12종 (aging-curve 참고), IB 1~7등급 → GPA
+- [x] 시험 시스템: formative / summative, 미니게임 9종 (aging-curve 참고), IB 1~7등급 → GPA
 - [x] 배드민턴 3D 원근 코트, 3판 2선승, 스매시/드롭/클리어, 아웃/네트
 
 ## 다음 할 일

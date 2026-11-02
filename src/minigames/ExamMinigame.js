@@ -15,7 +15,7 @@ const DEFAULT_COUNT = { formative: 2, summative: 5 };
  * config: {
  *   kind = 'formative' | 'summative',
  *   subject = '',             // shown in the title: "수학 Formative"
- *   tasks = '에임,강타',       // which questions (ids or Korean names); random if omitted
+ *   tasks = '에임,비트',       // which questions (ids or Korean names); random if omitted
  *   count,                    // how many random questions (default: formative 2, summative 5)
  * }
  */
