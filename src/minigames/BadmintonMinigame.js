@@ -13,6 +13,7 @@ const NET_Z = 0.5;
 const NET_H = 0.32;
 
 const RACKET_RADIUS = 78; // screen px within which Minjun's racket meets the shuttle
+const AIM_SWING = 700;    // sideways racket speed (px/s) that moves a shot one half-court width
 
 /** Shot shapes: how far, how high and how fast (seconds) the shuttle flies. */
 const SHOTS = {
@@ -304,11 +305,23 @@ export default class BadmintonMinigame extends BaseMinigame {
         const type = vy < -700 ? 'smash' : vy > 350 ? 'drop' : 'clear';
         const screen = this.project(pos.x, pos.z, pos.h);
         const offset = (screen.x - this.racket.x) / RACKET_RADIUS; // where on the racket face it landed
-        const aimX = pos.x * 0.3 + vx / 1500 + offset * 0.35 + Phaser.Math.FloatBetween(-0.1, 0.1);
+        // No swing = straight down the line it was hit on; a sideways swing bends it that way.
+        const aimX = pos.x + vx / AIM_SWING + offset * 0.2 + Phaser.Math.FloatBetween(-0.04, 0.04);
         const depth = { clear: [0.84, 0.98], drop: [0.56, 0.68], smash: [0.62, 0.86] }[type];
-        this.#launch('player', type, pos, { x: aimX, z: Phaser.Math.FloatBetween(...depth) });
+        const to = { x: aimX, z: Phaser.Math.FloatBetween(...depth) };
+        this.#launch('player', type, pos, to);
+        this.#markLanding(to);
         this.#call(SHOTS[type].label, COLORS.accent);
         this.tweens.add({ targets: this.racket, angle: { from: -25, to: 0 }, duration: 160 });
+    }
+
+    /** Brief ring where Minjun's shot will land: red when it is going out. */
+    #markLanding(to) {
+        const spot = this.project(Phaser.Math.Clamp(to.x, -1.3, 1.3), to.z);
+        const out = Math.abs(to.x) > 1;
+        const ring = this.add.ellipse(spot.x, spot.y, 70 * spot.s, 26 * spot.s)
+            .setStrokeStyle(3, out ? 0xff4d4d : 0xffffff, 0.9).setDepth(2);
+        this.tweens.add({ targets: ring, alpha: 0, duration: 900, onComplete: () => ring.destroy() });
     }
 
     /** Decides when (and whether) the opponent will reach Minjun's shot. */
