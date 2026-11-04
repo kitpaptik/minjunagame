@@ -24,7 +24,7 @@ export default class RunnerMinigame extends BaseMinigame {
     }
 
     create() {
-        const { width, height } = this.scale;
+        const { width, height } = this.view;
         this.duration = (this.config.duration ?? 25000) * this.byDifficulty({ easy: 0.8, normal: 1, hard: 1.2 });
         this.elapsed = 0;
         this.distance = 0;
@@ -84,7 +84,7 @@ export default class RunnerMinigame extends BaseMinigame {
 
         for (const dash of this.dashes) {
             dash.y += speed * dt;
-            if (dash.y > this.scale.height + 40) dash.y -= 80 * Math.ceil((this.scale.height + 120) / 80);
+            if (dash.y > this.view.height + 40) dash.y -= 80 * Math.ceil((this.view.height + 120) / 80);
         }
 
         const playerBounds = this.player.getBounds();
@@ -96,7 +96,7 @@ export default class RunnerMinigame extends BaseMinigame {
             }
         }
         this.obstacles = this.obstacles.filter((ob) => {
-            if (ob.y < this.scale.height + 120) return true;
+            if (ob.y < this.view.height + 120) return true;
             ob.destroy();
             return false;
         });
@@ -141,7 +141,7 @@ export default class RunnerMinigame extends BaseMinigame {
             for (const x of LANES) {
                 this.obstacles.push(this.add.rectangle(x, -80, 150, 110, 0x636e72).setStrokeStyle(4, 0x2d3436));
             }
-            const warn = this.add.text(this.scale.width / 2, 220, '!!!', textStyle(96, { fontStyle: 'bold', color: COLORS.bad }))
+            const warn = this.add.text(this.view.width / 2, 220, '!!!', textStyle(96, { fontStyle: 'bold', color: COLORS.bad }))
                 .setOrigin(0.5);
             this.tweens.add({ targets: warn, alpha: 0, duration: 250, yoyo: true, repeat: 3 });
         });

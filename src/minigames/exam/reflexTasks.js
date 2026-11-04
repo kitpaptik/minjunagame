@@ -75,7 +75,7 @@ export class SkillComboTask extends ExamTask {
         this.boxes = [];
         if (this.round >= this.rounds) {
             const avg = Math.round(this.perKey.reduce((a, b) => a + b, 0) / this.perKey.length);
-            this.done(scale(avg, this.scene.shorter(1000, 0.3), 320) - this.mistakes * 4, `키당 ${avg}ms · 실수 ${this.mistakes}`);
+            this.done(scale(avg, this.scene.shorter(1000, 0.3), 320) - this.mistakes * 4, `키당 ${avg}ms, 실수 ${this.mistakes}번`);
             return;
         }
         this.round += 1;

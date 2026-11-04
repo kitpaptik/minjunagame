@@ -1,5 +1,6 @@
 import ExamTask, { AREA, scale } from './ExamTask.js';
 import { COLORS } from '../../ui/theme.js';
+import { viewPoint } from '../../config.js';
 
 /** 에임 도장 - click 15 targets as fast as possible. They shrink, and later ones move. */
 export class AimTask extends ExamTask {
@@ -14,7 +15,7 @@ export class AimTask extends ExamTask {
         this.startedAt = this.now;
         this.target = this.add(this.scene.add.circle(0, 0, 40, 0xff6b81).setStrokeStyle(6, 0xffffff));
         this.dot = this.add(this.scene.add.circle(0, 0, 8, 0xffffff));
-        this.onPointer('pointerdown', (p) => this.#click(p));
+        this.onPointer('pointerdown', (pointer) => this.#click(viewPoint(pointer)));
         this.after(20000, () => this.#finish());
         this.#place();
     }
@@ -59,7 +60,7 @@ export class AimTask extends ExamTask {
         const seconds = (this.now - this.startedAt) / 1000;
         const perTarget = seconds / Math.max(1, this.hits);
         const speedScore = scale(perTarget, 1.4, 0.55) * (this.hits / this.total);
-        this.done(speedScore - this.misses * 3, `${this.hits}개 명중 · ${seconds.toFixed(1)}초 · 빗나감 ${this.misses}`);
+        this.done(speedScore - this.misses * 3, `${this.hits}개 명중, ${seconds.toFixed(1)}초, 빗나감 ${this.misses}번`);
     }
 }
 
@@ -67,7 +68,7 @@ export class AimTask extends ExamTask {
 export class DodgeTask extends ExamTask {
     static key = 'dodge';
     static title = '볼 피하기';
-    static howTo = 'WASD·방향키 또는 마우스로 움직여 날아오는 공을 피하세요.\n한 번 맞으면 끝! 20초 버티면 만점.';
+    static howTo = 'WASD나 방향키 또는 마우스로 움직여 날아오는 공을 피하세요.\n한 번 맞으면 끝! 20초 버티면 만점.';
 
     start() {
         this.duration = 20000;
@@ -79,7 +80,7 @@ export class DodgeTask extends ExamTask {
             .setStrokeStyle(3, 0x5a5a8a));
         this.player = this.add(this.scene.add.circle(AREA.cx, AREA.cy, 14, 0x00e5ff).setStrokeStyle(3, 0xffffff));
         this.keys = this.scene.input.keyboard.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT');
-        this.lastPointer = { x: this.scene.input.activePointer.x, y: this.scene.input.activePointer.y };
+        this.lastPointer = viewPoint(this.scene.input.activePointer);
         this.followPointer = false;
         this.#spawnLoop();
     }
@@ -132,7 +133,7 @@ export class DodgeTask extends ExamTask {
         const k = this.keys;
         const dx = (k.D.isDown || k.RIGHT.isDown ? 1 : 0) - (k.A.isDown || k.LEFT.isDown ? 1 : 0);
         const dy = (k.S.isDown || k.DOWN.isDown ? 1 : 0) - (k.W.isDown || k.UP.isDown ? 1 : 0);
-        const p = this.scene.input.activePointer;
+        const p = viewPoint(this.scene.input.activePointer);
         if (p.x !== this.lastPointer.x || p.y !== this.lastPointer.y) {
             this.followPointer = true;
             this.lastPointer = { x: p.x, y: p.y };

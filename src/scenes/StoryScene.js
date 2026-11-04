@@ -1,13 +1,14 @@
-import chapters from '../game/story/index.js';
+import chapters, { chapterOrder } from '../game/story/index.js';
 import Stats from '../game/Stats.js';
-import { STAT_DEFS, formatStat } from '../game/statDefs.js';
+import { STAT_DEFS, DIFFICULTIES, formatStat } from '../game/statDefs.js';
 import SaveManager from '../engine/SaveManager.js';
-import { toColor } from '../engine/utils.js';
 import minigames from '../minigames/index.js';
-import DialogueBox from '../ui/DialogueBox.js';
-import StatsBar from '../ui/StatsBar.js';
-import Button from '../ui/Button.js';
-import { COLORS, textStyle } from '../ui/theme.js';
+import { rollRandomEvent } from '../game/randomEvents.js';
+import ChatFeed from '../ui/ChatFeed.js';
+import Sidebar from '../ui/Sidebar.js';
+import StatsPanel from '../ui/StatsPanel.js';
+import { SHELL } from '../ui/shell.js';
+import { PALETTE, INK, RADIUS, textStyle } from '../ui/theme.js';
 
 /** Returned by a step to end the current run (scene is switching away). */
 const STOP = Symbol('stop');
@@ -15,6 +16,7 @@ const DEFAULT_PLACE = { name: '', bg: '#2b3a55' };
 
 /**
  * Runs chapter scripts from /story (parsed into steps by src/engine/StoryScript.js).
+ * The story is shown as a chat channel: lines are messages, places are channels, chapters are servers.
  * Autosaves before every top-level step so "이어하기" resumes exactly there.
  */
 export default class StoryScene extends Phaser.Scene {
@@ -30,15 +32,20 @@ export default class StoryScene extends Phaser.Scene {
     }
 
     create() {
-        const { width, height } = this.scale;
+        const { width, height } = this.view;
         this.stats = new Stats(this);
         this.chapter = chapters[this.chapterId];
 
-        this.bg = this.add.rectangle(width / 2, height / 2, width, height, toColor(this.place.bg));
-        this.placeText = this.add.text(40, 70, this.place.name, textStyle(20, { color: COLORS.muted }));
-        this.add.text(width - 24, 70, 'ESC: 타이틀', textStyle(16, { color: COLORS.muted })).setOrigin(1, 0);
-        new StatsBar(this);
-        this.dialogue = new DialogueBox(this).setVisible(false);
+        this.add.rectangle(0, 0, width, height, PALETTE.chat).setOrigin(0);
+        this.feed = new ChatFeed(this);
+        this.sidebar = new Sidebar(this, {
+            chapters: chapterOrder.map((id) => chapters[id]).filter(Boolean),
+            currentChapter: this.chapter ?? { id: this.chapterId, title: this.chapterId ?? '' },
+            difficultyLabel: DIFFICULTIES[this.registry.get('difficulty')]?.label ?? '보통',
+        });
+        this.#buildChannelHeader();
+        new StatsPanel(this);
+        this.#setPlace(this.place);
 
         this.#bindInput();
 
@@ -47,6 +54,18 @@ export default class StoryScene extends Phaser.Scene {
             return;
         }
         this.#run(this.startNode ?? this.chapter.start, this.startIndex);
+    }
+
+    /** Top bar of the chat column: the current channel, and how to leave. */
+    #buildChannelHeader() {
+        const width = SHELL.chatRight - SHELL.chatLeft;
+        this.add.rectangle(SHELL.chatLeft, 0, width, SHELL.headerHeight, PALETTE.chat).setOrigin(0).setDepth(30);
+        this.add.rectangle(SHELL.chatLeft, SHELL.headerHeight - 1, width, 1, PALETTE.rail).setOrigin(0).setDepth(30);
+        this.add.text(SHELL.chatLeft + 16, 24, '#', textStyle(22, { color: INK.faint })).setOrigin(0, 0.5).setDepth(31);
+        this.channelText = this.add.text(SHELL.chatLeft + 38, 24, '', textStyle(16, { weight: 700, color: INK.strong }))
+            .setOrigin(0, 0.5).setDepth(31);
+        this.add.text(SHELL.chatRight - 16, 24, 'ESC 누르면 타이틀로', textStyle(13, { color: INK.muted }))
+            .setOrigin(1, 0.5).setDepth(31);
     }
 
     // ---- Input -------------------------------------------------------------
@@ -72,8 +91,8 @@ export default class StoryScene extends Phaser.Scene {
     }
 
     #advance() {
-        if (this.dialogue.isTyping) {
-            this.dialogue.finishTyping();
+        if (this.feed.isTyping) {
+            this.feed.finishTyping();
             return;
         }
         const resolve = this.advanceResolver;
@@ -98,6 +117,8 @@ export default class StoryScene extends Phaser.Scene {
                     throw new Error(`노드 "${nodeId}"가 goto/chapterEnd/ending 없이 끝났습니다.`);
                 }
                 this.#save(nodeId, i);
+                const surprise = await this.#maybeSurprise(steps[i]);
+                if (!this.alive || surprise === STOP) return;
                 const result = await this.#exec(steps[i]);
                 i += 1;
                 if (!this.alive || result === STOP) return;
@@ -111,6 +132,21 @@ export default class StoryScene extends Phaser.Scene {
             console.error(err);
             if (this.alive) this.#showError(err.message);
         }
+    }
+
+    /**
+     * Before a story line, maybe interrupt with a random QTE / formative / summative (src/game/randomEvents.js).
+     * Chapters opt out with "돌발 끔" in their script header.
+     */
+    async #maybeSurprise(step) {
+        if (step.text === undefined || this.chapter.randomEvents === false) return undefined;
+        this.linesInChapter = (this.linesInChapter ?? 0) + 1;
+        this.linesSinceSurprise = (this.linesSinceSurprise ?? 0) + 1;
+        const event = rollRandomEvent(this.linesSinceSurprise, this.linesInChapter);
+        if (!event) return undefined;
+        this.linesSinceSurprise = 0;
+        const result = await this.#execAll(event);
+        return result === STOP ? STOP : undefined; // a surprise never moves the story elsewhere
     }
 
     #node(nodeId) {
@@ -137,8 +173,12 @@ export default class StoryScene extends Phaser.Scene {
         }
         if (step.title !== undefined) return this.#titleCard(step.title, step.sub);
         if (step.text !== undefined) {
-            this.dialogue.show(step.say ?? null, step.text);
+            this.feed.say(step.say ?? null, step.text);
             await this.#waitForAdvance();
+            return undefined;
+        }
+        if (step.system !== undefined) {
+            this.feed.system(step.system, step.tone);
             return undefined;
         }
         if (step.choice) return this.#choose(step.choice);
@@ -156,38 +196,22 @@ export default class StoryScene extends Phaser.Scene {
 
     #setPlace(place) {
         this.place = place;
-        this.placeText.setText(place.name);
-        this.bg.setFillStyle(toColor(place.bg));
+        this.channelText.setText(this.sidebar.setPlace(place.name));
     }
 
     async #titleCard(title, sub) {
-        const { width, height } = this.scale;
-        this.dialogue.setVisible(false);
-        const card = this.add.container(0, 0).setDepth(300).setAlpha(0);
-        card.add([
-            this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.9),
-            this.add.text(width / 2, height / 2 - 20, title, textStyle(64, { fontStyle: 'bold', color: COLORS.accent }))
-                .setOrigin(0.5),
-            this.add.text(width / 2, height / 2 + 50, sub ?? '', textStyle(26, { color: COLORS.muted })).setOrigin(0.5),
-        ]);
-        this.tweens.add({ targets: card, alpha: 1, duration: 400 });
+        this.feed.divider(title, sub);
         await this.#waitForAdvance();
-        this.tweens.add({ targets: card, alpha: 0, duration: 300, onComplete: () => card.destroy() });
         return undefined;
     }
 
     #choose(options) {
-        const { width } = this.scale;
-        const spacing = 84;
-        const top = 300 - ((options.length - 1) * spacing) / 2;
-        this.dialogue.hint.setVisible(false);
-
         return new Promise((resolve) => {
             let picked = false;
-            const pick = async (option) => {
+            const pick = async (option, index) => {
                 if (picked) return;
                 picked = true;
-                buttons.forEach((b) => b.destroy());
+                buttons.forEach((b, i) => b.lock(i === index));
                 this.input.keyboard.off('keydown', onKey);
 
                 const add = { ...option.add };
@@ -198,17 +222,16 @@ export default class StoryScene extends Phaser.Scene {
                 resolve(replyJump ?? option.next);
             };
 
-            const buttons = options.map((option, i) => {
+            const buttons = this.feed.choices(options.map((option, i) => {
                 const lockReason = this.#lockReason(option);
                 const cost = option.cost ? `  (${formatStat('hanwha', option.cost)})` : '';
-                return new Button(this, width / 2, top + i * spacing, `${i + 1}. ${option.label}${cost}`, {
-                    width: 620,
-                    height: 66,
-                    disabled: lockReason !== null,
-                    onClick: () => pick(option),
-                    onDisabledClick: (button) => lockReason && this.#toast(lockReason, button.y + 46),
-                }).setDepth(150);
-            });
+                return {
+                    label: `${i + 1}. ${option.label}${cost}`,
+                    locked: lockReason !== null,
+                    onClick: () => pick(option, i),
+                    onDisabledClick: () => lockReason && this.feed.warn(lockReason),
+                };
+            }));
 
             // Number keys 1-9 pick a choice.
             const onKey = (event) => {
@@ -231,11 +254,11 @@ export default class StoryScene extends Phaser.Scene {
         return null;
     }
 
+    /** Full-screen picture over a dark backdrop, like an image viewer, with the caption under it. */
     async #showCg(key, caption) {
-        const { width, height } = this.scale;
-        this.dialogue.setVisible(false);
+        const { width, height } = this.view;
         const layer = this.add.container(0, 0).setDepth(300).setAlpha(0);
-        layer.add(this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.85));
+        layer.add(this.add.rectangle(width / 2, height / 2, width, height, PALETTE.floating, 0.88));
         if (this.textures.exists(key)) {
             const img = this.add.image(width / 2, height / 2 - 20, key);
             img.setScale(Math.min((width - 160) / img.width, (height - 200) / img.height, 1));
@@ -243,23 +266,18 @@ export default class StoryScene extends Phaser.Scene {
         } else {
             // Placeholder until the real picture is added to src/game/assets.js.
             layer.add([
-                this.add.rectangle(width / 2, height / 2 - 20, 640, 400, 0x333344).setStrokeStyle(3, COLORS.panelBorder),
-                this.add.text(width / 2, height / 2 - 20, `[이미지: ${key}]`, textStyle(26, { color: COLORS.muted })).setOrigin(0.5),
+                this.add.graphics({ x: width / 2, y: height / 2 - 20 })
+                    .fillStyle(PALETTE.chat).fillRoundedRect(-320, -200, 640, 400, RADIUS.card),
+                this.add.text(width / 2, height / 2 - 20, `이미지 자리: ${key}`, textStyle(18, { color: INK.muted })).setOrigin(0.5),
             ]);
         }
         if (caption) {
-            layer.add(this.add.text(width / 2, height - 60, caption, textStyle(24)).setOrigin(0.5));
+            layer.add(this.add.text(width / 2, height - 70, caption, textStyle(18, { weight: 500, color: INK.strong })).setOrigin(0.5));
         }
         this.tweens.add({ targets: layer, alpha: 1, duration: 300 });
         await this.#waitForAdvance();
         layer.destroy(true);
         return undefined;
-    }
-
-    #toast(message, y) {
-        const text = this.add.text(this.scale.width / 2, y, message, textStyle(20, { color: COLORS.bad }))
-            .setOrigin(0.5).setDepth(160);
-        this.tweens.add({ targets: text, alpha: 0, delay: 900, duration: 500, onComplete: () => text.destroy() });
     }
 
     #applyStats({ add, set }) {
@@ -269,7 +287,7 @@ export default class StoryScene extends Phaser.Scene {
     }
 
     #upgrade(points) {
-        this.dialogue.setVisible(false);
+        this.feed.setHint('스탯 강화 중');
         return new Promise((resolve) => {
             this.events.once('upgrade-done', () => resolve(undefined));
             this.scene.launch('StatUpgrade', { points });
@@ -289,7 +307,10 @@ export default class StoryScene extends Phaser.Scene {
         if (result.add) this.stats.apply({ add: result.add });
         const death = this.stats.deathEnding();
         if (death) return this.#ending(death);
-        return (result.success ? step.win : step.lose) ?? undefined;
+        // A branch is a scene name to jump to, or (in random events) a list of steps to run right here.
+        const branch = result.success ? step.win : step.lose;
+        if (Array.isArray(branch)) return this.#execAll(branch);
+        return branch ?? undefined;
     }
 
     #endChapter(nextChapterId) {
@@ -325,11 +346,11 @@ export default class StoryScene extends Phaser.Scene {
     }
 
     #showError(message) {
-        this.add.text(40, 120, `스토리 오류:\n${message}`, textStyle(20, {
-            color: COLORS.bad,
-            backgroundColor: '#000000cc',
+        this.add.text(SHELL.chatLeft + 16, SHELL.headerHeight + 16, `스토리 오류:\n${message}`, textStyle(16, {
+            color: INK.bad,
+            backgroundColor: INK.floating,
             padding: { x: 12, y: 10 },
-            wordWrap: { width: this.scale.width - 80, useAdvancedWrap: true },
+            wordWrap: { width: SHELL.chatRight - SHELL.chatLeft - 32, useAdvancedWrap: true },
         })).setDepth(1000);
     }
 }

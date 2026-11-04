@@ -1,4 +1,5 @@
 import BaseMinigame from './BaseMinigame.js';
+import { viewPoint } from '../config.js';
 import { COLORS, textStyle } from '../ui/theme.js';
 
 // ---- Court projection ------------------------------------------------------
@@ -11,6 +12,14 @@ const DEPTH = 1.7;
 const HEIGHT_PX = 300;
 const NET_Z = 0.5;
 const NET_H = 0.32;
+
+const WALL_H = 0.7;   // side walls the shuttle bounces off
+
+/** Folds a straight sideways path between the side walls at x = -1 and 1, so a wide shot bounces back in. */
+function wallBounce(x) {
+    const m = (((x + 1) % 4) + 4) % 4;
+    return m <= 2 ? m - 1 : 3 - m;
+}
 
 const RACKET_RADIUS = 78; // screen px within which Minjun's racket meets the shuttle
 const AIM_SWING = 700;    // sideways racket speed (px/s) that moves a shot one half-court width
@@ -27,7 +36,7 @@ const SHOTS = {
  *
  * The racket follows the mouse; touch the shuttle with it to hit back.
  * Swing up fast = smash (needs a high contact or it hits the net), swing down = drop, otherwise clear.
- * Sideways racket speed aims the shot - aim at the lines to beat the opponent, but too far is out.
+ * Sideways racket speed aims the shot. The sidelines are walls: a wide shot bounces back in, like Racket Rivals.
  *
  * config: {
  *   winScore = 11,         // points per game (win by 2, capped at winScore + 4)
@@ -48,13 +57,13 @@ export default class BadmintonMinigame extends BaseMinigame {
             title: `배드민턴 vs ${this.config.opponentName ?? '상대'}`,
             howTo: `마우스로 라켓을 움직여 셔틀콕에 대면 친다.\n`
                 + `위로 빠르게 휘두르면 스매시(높은 데서 쳐야 함), 아래로 휘두르면 드롭.\n`
-                + `옆으로 휘두르면 방향 조절 - 라인 끝을 노려라, 너무 멀면 아웃!\n`
+                + `옆으로 휘두르면 방향 조절. 옆벽에 맞으면 튕겨 나온다 - 벽을 이용해 상대를 흔들어라!\n`
                 + `${this.config.winScore ?? 11}점 ${games}판 ${Math.ceil(games / 2)}선승.`,
         };
     }
 
     create() {
-        const { width, height } = this.scale;
+        const { width, height } = this.view;
         this.cx = width / 2;
         this.winScore = this.config.winScore ?? 11;
         this.gamesToWin = Math.ceil((this.config.games ?? 3) / 2);
@@ -65,7 +74,7 @@ export default class BadmintonMinigame extends BaseMinigame {
         this.points = { player: 0, opponent: 0 };
         this.games = { player: 0, opponent: 0 };
         this.gameNumber = 1;
-        this.shot = null;           // current flight: { from, to, arc, duration, t, by, type, netT, out }
+        this.shot = null;           // current flight: { from, to, arc, duration, t, by, type, netT, aiHitT }
         this.state = 'idle';        // idle | serve-player | rally | dead
         this.rallySpeed = 1;
         this.opponentX = 0;
@@ -129,6 +138,13 @@ export default class BadmintonMinigame extends BaseMinigame {
         line(-1, 0.42, 1, 0.42, 3); // short service lines
         line(-1, 0.58, 1, 0.58, 3);
 
+        // Glass side walls along both sidelines.
+        for (const x of [-1, 1]) {
+            const pts = [this.project(x, 0, 0), this.project(x, 1, 0), this.project(x, 1, WALL_H), this.project(x, 0, WALL_H)];
+            g.fillStyle(0xffffff, 0.08).fillPoints(pts, true);
+            g.lineStyle(2, 0xffffff, 0.35).lineBetween(pts[2].x, pts[2].y, pts[3].x, pts[3].y);
+        }
+
         // Net: posts, mesh and white tape, drawn above far-side objects and below near-side ones.
         const net = this.add.graphics().setDepth(5);
         const l0 = this.project(-1.08, NET_Z, 0);
@@ -174,7 +190,7 @@ export default class BadmintonMinigame extends BaseMinigame {
 
     #renderScore() {
         this.scoreText.setText(`민준 ${this.points.player} : ${this.points.opponent} ${this.opponentName}`);
-        this.gamesText.setText(`GAME ${this.gameNumber}   ·   게임 스코어 ${this.games.player} - ${this.games.opponent}`);
+        this.gamesText.setText(`GAME ${this.gameNumber}, 게임 스코어 ${this.games.player} - ${this.games.opponent}`);
     }
 
     #call(text, color = COLORS.text) {
@@ -194,7 +210,7 @@ export default class BadmintonMinigame extends BaseMinigame {
     }
 
     #moveRacket(time) {
-        const p = this.input.activePointer;
+        const p = viewPoint(this.input.activePointer);
         this.racket.setPosition(p.x, Math.max(p.y, HORIZON_Y + 200));
         this.pointerTrail.push({ x: this.racket.x, y: this.racket.y, t: time });
         while (this.pointerTrail.length > 2 && time - this.pointerTrail[0].t > 120) this.pointerTrail.shift();
@@ -218,9 +234,12 @@ export default class BadmintonMinigame extends BaseMinigame {
 
     #flyShuttle(dt) {
         const shot = this.shot;
+        const before = Phaser.Math.Linear(shot.from.x, shot.to.x, Math.min(shot.t, 1));
         shot.t += dt / shot.duration;
         const pos = this.#shotPosition(shot, Math.min(shot.t, 1));
         this.#drawShuttle(pos);
+        const after = Phaser.Math.Linear(shot.from.x, shot.to.x, Math.min(shot.t, 1));
+        if (Math.floor((before + 1) / 2) !== Math.floor((after + 1) / 2)) this.#wallFlash(pos);
 
         // Net cord: the shot was too low to clear the net.
         if (shot.netT !== null && shot.t >= shot.netT) {
@@ -236,8 +255,7 @@ export default class BadmintonMinigame extends BaseMinigame {
             return;
         }
         if (shot.t >= 1) {
-            const winner = shot.out ? (shot.by === 'player' ? 'opponent' : 'player') : shot.by;
-            this.#endRally(winner, shot.out ? '아웃!' : '인!');
+            this.#endRally(shot.by, '인!');
         }
     }
 
@@ -247,6 +265,13 @@ export default class BadmintonMinigame extends BaseMinigame {
         this.shuttle.setVisible(true).setPosition(screen.x, screen.y).setScale(0.6 + screen.s * 1.1)
             .setDepth(pos.z > NET_Z ? 4 : 6);
         this.shadow.setVisible(true).setPosition(ground.x, ground.y).setScale(ground.s * 1.4);
+    }
+
+    /** A quick ring on the glass where the shuttle bounced. */
+    #wallFlash(pos) {
+        const p = this.project(pos.x > 0 ? 1 : -1, pos.z, Math.min(pos.h, WALL_H));
+        const ring = this.add.ellipse(p.x, p.y, 18 * p.s + 8, 40 * p.s + 10).setStrokeStyle(3, 0xffffff, 0.9).setDepth(7);
+        this.tweens.add({ targets: ring, alpha: 0, scale: 1.6, duration: 350, onComplete: () => ring.destroy() });
     }
 
     #racketTouches(pos) {
@@ -259,19 +284,18 @@ export default class BadmintonMinigame extends BaseMinigame {
 
     #shotPosition(shot, t) {
         return {
-            x: Phaser.Math.Linear(shot.from.x, shot.to.x, t),
+            x: wallBounce(Phaser.Math.Linear(shot.from.x, shot.to.x, t)),
             z: Phaser.Math.Linear(shot.from.z, shot.to.z, t),
             h: Phaser.Math.Linear(shot.from.h, 0, t) + shot.arc * 4 * t * (1 - t),
         };
     }
 
-    /** Starts a flight. Works out in advance whether it clips the net and whether it lands out. */
+    /** Starts a flight. Works out in advance whether it clips the net. Sideways it can only bounce, never go out. */
     #launch(by, type, from, to, durationScale = 1) {
         const spec = SHOTS[type];
         const shot = {
             by, type, from, to, t: 0, arc: spec.arc,
             duration: spec.duration * durationScale * this.rallySpeed,
-            out: Math.abs(to.x) > 1 || to.z < 0 || to.z > 1,
             netT: null,
             aiHitT: null,
         };
@@ -281,7 +305,7 @@ export default class BadmintonMinigame extends BaseMinigame {
         this.state = 'rally';
         this.rallySpeed = Math.max(0.6, this.rallySpeed * 0.97);
         if (by === 'player') this.#planOpponent(shot);
-        else this.opponentTargetX = Phaser.Math.Clamp(-to.x * 0.3, -0.5, 0.5); // recover toward the middle
+        else this.opponentTargetX = Phaser.Math.Clamp(-wallBounce(to.x) * 0.3, -0.5, 0.5); // recover toward the middle
     }
 
     #playerServe() {
@@ -315,12 +339,11 @@ export default class BadmintonMinigame extends BaseMinigame {
         this.tweens.add({ targets: this.racket, angle: { from: -25, to: 0 }, duration: 160 });
     }
 
-    /** Brief ring where Minjun's shot will land: red when it is going out. */
+    /** Brief ring where Minjun's shot will land, after any wall bounce. */
     #markLanding(to) {
-        const spot = this.project(Phaser.Math.Clamp(to.x, -1.3, 1.3), to.z);
-        const out = Math.abs(to.x) > 1;
+        const spot = this.project(wallBounce(to.x), to.z);
         const ring = this.add.ellipse(spot.x, spot.y, 70 * spot.s, 26 * spot.s)
-            .setStrokeStyle(3, out ? 0xff4d4d : 0xffffff, 0.9).setDepth(2);
+            .setStrokeStyle(3, 0xffffff, 0.9).setDepth(2);
         this.tweens.add({ targets: ring, alpha: 0, duration: 900, onComplete: () => ring.destroy() });
     }
 
@@ -329,10 +352,9 @@ export default class BadmintonMinigame extends BaseMinigame {
         const land = shot.to;
         const reactDelay = (0.4 - 0.3 * this.skill) * (this.rigged ? 0 : 1);
         this.time.delayedCall(reactDelay * 1000, () => {
-            this.opponentTargetX = Phaser.Math.Clamp(land.x, -1.05, 1.05);
+            this.opponentTargetX = wallBounce(land.x);
         });
         if (shot.netT !== null) return;
-        if (shot.out && !this.rigged && Math.random() < 0.9) return; // lets it fly out
 
         // Opponent meets the shuttle near the end of its flight if it can get there in time.
         const hitT = 0.82;
@@ -348,13 +370,13 @@ export default class BadmintonMinigame extends BaseMinigame {
     #opponentHit(pos) {
         const roll = Math.random();
         const type = pos.h > 0.5 && roll < 0.3 ? 'smash' : roll < 0.55 ? 'drop' : 'clear';
-        // Aim away from Minjun's racket. Weaker opponents aim worse and sometimes hit out.
+        // Aim away from Minjun's racket (sometimes off the wall). Weaker opponents aim worse.
         const s = 1 / (1 + 0.2 * DEPTH);
         const playerX = Phaser.Math.Clamp((this.racket.x - this.cx) / (HALF_WIDTH * s), -1, 1);
         let x = Math.random() < 0.4 + 0.5 * this.skill
             ? -Math.sign(playerX || 1) * Phaser.Math.FloatBetween(0.45, 0.92)
             : Phaser.Math.FloatBetween(-0.8, 0.8);
-        if (!this.rigged && Math.random() < (1 - this.skill) * 0.12) x = Math.sign(x || 1) * 1.15;
+        if (Math.random() < 0.15 + 0.2 * this.skill) x = Math.sign(x || 1) * Phaser.Math.FloatBetween(1.2, 1.6); // off the wall
         const depth = { clear: [0.03, 0.14], drop: [0.3, 0.42], smash: [0.08, 0.3] }[type];
         const quicker = this.shorter(1, 0.3) * (this.rigged ? 0.9 : 1);
         this.#launch('opponent', type, pos, { x, z: Phaser.Math.FloatBetween(...depth) }, quicker);

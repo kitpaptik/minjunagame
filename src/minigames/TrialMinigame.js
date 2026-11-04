@@ -27,7 +27,7 @@ export default class TrialMinigame extends BaseMinigame {
     }
 
     create() {
-        const { width, height } = this.scale;
+        const { width, height } = this.view;
         this.judge = this.config.judge ?? '판사';
         this.questions = this.config.questions ?? [];
         this.lives = this.config.lives ?? 3;
@@ -77,7 +77,7 @@ export default class TrialMinigame extends BaseMinigame {
             this.finish({ success: true, label: '무죄!' });
             return;
         }
-        const { width } = this.scale;
+        const { width } = this.view;
         const question = this.questions[this.index];
         this.progressText.setText(`기소 ${this.index + 1}/${this.questions.length}`);
         this.accusation.setText(`${this.judge}: "${question.q}"`);

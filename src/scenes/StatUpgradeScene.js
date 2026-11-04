@@ -1,11 +1,15 @@
 import Stats from '../game/Stats.js';
 import { UPGRADE_OPTIONS } from '../game/statDefs.js';
 import Button from '../ui/Button.js';
-import { COLORS, textStyle } from '../ui/theme.js';
+import { PALETTE, INK, RADIUS, textStyle, card } from '../ui/theme.js';
+import { SHELL } from '../ui/shell.js';
+
+const CARD_WIDTH = 440;
 
 /**
- * Overlay launched by StoryScene for `{ upgrade: N }` steps.
- * Each click spends one point immediately; emits 'upgrade-done' on the Story scene when finished.
+ * Modal launched by StoryScene for `{ upgrade: N }` steps.
+ * The backdrop stops at the stats panel, so each point's effect shows there as it is spent.
+ * Emits 'upgrade-done' on the Story scene when finished.
  */
 export default class StatUpgradeScene extends Phaser.Scene {
     constructor() {
@@ -17,19 +21,19 @@ export default class StatUpgradeScene extends Phaser.Scene {
     }
 
     create() {
-        const { width, height } = this.scale;
+        const { height } = this.view;
         const stats = new Stats(this);
+        const cx = (SHELL.chatLeft + SHELL.chatRight) / 2;
+        const cardHeight = 96 + UPGRADE_OPTIONS.length * 52 + 76;
+        const top = height / 2 - cardHeight / 2;
 
-        // Dim everything below the stats bar and its +/- popups so changes stay visible while spending points.
-        const dimTop = 100;
-        this.add.rectangle(width / 2, (dimTop + height) / 2, width, height - dimTop, 0x000000, 0.75).setInteractive();
-        this.add.rectangle(width / 2, height / 2 + 20, 760, 520, COLORS.panel).setStrokeStyle(3, COLORS.panelBorder);
-        this.add.text(width / 2, 150, '스탯 강화', textStyle(44, { fontStyle: 'bold', color: COLORS.accent })).setOrigin(0.5);
-        const pointsText = this.add.text(width / 2, 205, '', textStyle(24, { color: COLORS.gold })).setOrigin(0.5);
+        card(this, cx, height / 2, CARD_WIDTH, cardHeight, { backdrop: true, backdropWidth: SHELL.chatRight });
+        this.add.text(cx, top + 32, '스탯 강화', textStyle(20, { weight: 700, color: INK.strong })).setOrigin(0.5, 0);
+        const pointsText = this.add.text(cx, top + 62, '', textStyle(14, { color: INK.muted })).setOrigin(0.5, 0);
 
         const buttons = UPGRADE_OPTIONS.map((opt, i) =>
-            new Button(this, width / 2, 280 + i * 80, opt.text, {
-                width: 480,
+            new Button(this, cx, top + 112 + i * 52, opt.text, {
+                width: CARD_WIDTH - 48,
                 onClick: () => {
                     if (this.points <= 0) return;
                     stats.apply({ add: { [opt.key]: opt.amount } });
@@ -38,14 +42,19 @@ export default class StatUpgradeScene extends Phaser.Scene {
                 },
             }));
 
-        const done = new Button(this, width / 2, 610, '완료', {
-            width: 240,
+        // Footer strip, like a modal's action row.
+        const footerY = top + cardHeight - 68;
+        this.add.graphics().fillStyle(PALETTE.sidebar)
+            .fillRoundedRect(cx - CARD_WIDTH / 2, footerY, CARD_WIDTH, 68, { tl: 0, tr: 0, bl: RADIUS.card, br: RADIUS.card });
+        const done = new Button(this, cx + CARD_WIDTH / 2 - 24 - 60, footerY + 34, '완료', {
+            width: 120,
+            height: 40,
+            variant: 'primary',
             onClick: () => this.#finish(),
-            disabled: true,
         });
 
         const refresh = () => {
-            pointsText.setText(`남은 포인트: ${this.points}`);
+            pointsText.setText(this.points > 0 ? `남은 포인트 ${this.points}개` : '포인트를 다 썼어요');
             buttons.forEach((b) => b.setDisabled(this.points <= 0));
             done.setDisabled(this.points > 0);
         };

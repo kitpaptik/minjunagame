@@ -73,7 +73,7 @@ class StoryParser {
     }
 
     parse(id) {
-        const chapter = { id, title: id, subtitle: '', start: null, nodes: {} };
+        const chapter = { id, title: id, subtitle: '', start: null, nodes: {}, randomEvents: true };
         this.questionSets = {};
         this.refs = []; // node names used by →, checked once every node is known
 
@@ -104,8 +104,13 @@ class StoryParser {
     #parseHeader(chapter) {
         while (this.#peek() && !this.#isNode(this.#peek())) {
             const line = this.#next();
+            const surprise = line.text.match(/^돌발\s*(끔|켬)$/);
+            if (surprise) {
+                chapter.randomEvents = surprise[1] === '켬';
+                continue;
+            }
             const m = line.text.match(/^(제목|부제)\s+(.+)$/);
-            if (!m) this.#fail(line, '첫 장면(# 이름) 전에는 "제목 ..."과 "부제 ..."만 쓸 수 있습니다.');
+            if (!m) this.#fail(line, '첫 장면(# 이름) 전에는 "제목 ...", "부제 ...", "돌발 끔"만 쓸 수 있습니다.');
             chapter[m[1] === '제목' ? 'title' : 'subtitle'] = m[2];
         }
     }

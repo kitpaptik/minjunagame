@@ -15,7 +15,7 @@ export function createSpawn(scene) {
 
         /** Fills the whole view with a solid color, or stretches an image texture over it. */
         background: (keyOrColor) => {
-            const { width, height } = scene.scale;
+            const { width, height } = scene.view;
             const isTexture = typeof keyOrColor === 'string' && scene.textures.exists(keyOrColor);
             const obj = isTexture
                 ? scene.add.image(width / 2, height / 2, keyOrColor).setDisplaySize(width, height)

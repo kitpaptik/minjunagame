@@ -22,17 +22,17 @@ export default class QteMinigame extends BaseMinigame {
     get info() {
         return {
             title: '돌발 QTE',
-            howTo: '화면에 뜨는 키를 시간 안에 눌러라!\n틀린 키를 누르거나 시간이 지나면 실패.',
+            howTo: '화면에 키가 뜨는 순간 바로 눌러라! (0.6초)\n틀린 키를 누르거나 늦으면 실패.',
         };
     }
 
     create() {
-        const { width, height } = this.scale;
+        const { width, height } = this.view;
         this.add.rectangle(width / 2, height / 2, width, height, 0x1b1b2f);
 
         this.rounds = this.config.rounds ?? 6;
         this.required = this.config.required ?? Math.ceil(this.rounds * 0.66);
-        this.windowMs = this.shorter(this.byDifficulty({ easy: 1700, normal: 1250, hard: 900 }));
+        this.windowMs = this.shorter(this.byDifficulty({ easy: 850, normal: 620, hard: 460 })); // react now, not after reading
         this.round = 0;
         this.hits = 0;
 

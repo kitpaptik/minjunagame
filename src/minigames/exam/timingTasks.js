@@ -63,7 +63,7 @@ export class RhythmTask extends ExamTask {
         this.hud(`${judged} / ${this.notes.length}`);
         if (now > this.endAt) {
             const accuracy = this.points / this.notes.length;
-            this.done(accuracy - this.bad * 2, `정확도 ${Math.round(accuracy)}% · 헛누름 ${this.bad}`);
+            this.done(accuracy - this.bad * 2, `정확도 ${Math.round(accuracy)}%, 헛누름 ${this.bad}번`);
         }
     }
 

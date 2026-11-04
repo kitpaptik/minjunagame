@@ -1,8 +1,7 @@
-import { SETTINGS } from '../config.js';
 import manifest from '../game/assets.js';
 import { queueAssets, finalizeAssets } from '../engine/AssetLoader.js';
 import { STORY_DIR, CHAPTER_LIST, readChapterList, buildChapters } from '../game/story/index.js';
-import { textStyle, COLORS } from '../ui/theme.js';
+import { PALETTE, INK, textStyle } from '../ui/theme.js';
 
 const LIST_KEY = 'story:list';
 const storyKey = (id) => `story:${id}`;
@@ -16,14 +15,15 @@ export default class PreloadScene extends Phaser.Scene {
     }
 
     preload() {
-        const { width, height } = this.scale;
+        const { width, height } = this.view;
         const barWidth = width * 0.5;
         const x = (width - barWidth) / 2;
         const y = height / 2;
 
-        this.add.rectangle(width / 2, y, barWidth + 4, 24).setStrokeStyle(2, 0xffffff);
-        const bar = this.add.rectangle(x, y, 1, 18, 0x00ffff).setOrigin(0, 0.5);
-        this.add.text(width / 2, y - 40, 'Loading...', { fontFamily: SETTINGS.font, fontSize: '20px' }).setOrigin(0.5);
+        this.add.rectangle(0, 0, width, height, PALETTE.rail).setOrigin(0);
+        this.add.rectangle(width / 2, y, barWidth, 8, PALETTE.chat);
+        const bar = this.add.rectangle(x, y, 1, 8, PALETTE.brand).setOrigin(0, 0.5);
+        this.add.text(width / 2, y - 32, '불러오는 중', textStyle(15, { color: INK.muted })).setOrigin(0.5);
         this.load.on(Phaser.Loader.Events.PROGRESS, (p) => {
             bar.width = Math.max(1, barWidth * p);
         });
@@ -57,14 +57,14 @@ export default class PreloadScene extends Phaser.Scene {
     /** Script mistakes stop the game here with the file and line, so they're fixed before playing. */
     #showErrors(errors) {
         errors.forEach((e) => console.error(`[대본 오류] ${e}`));
-        const { width, height } = this.scale;
+        const { width, height } = this.view;
         this.children.removeAll(true);
-        this.add.rectangle(width / 2, height / 2, width, height, 0x1a0f14);
-        this.add.text(60, 50, '대본(story 폴더)에 고칠 곳이 있어요', textStyle(34, { fontStyle: 'bold', color: COLORS.bad }));
-        this.add.text(60, 120, errors.slice(0, 8).map((e) => `• ${e}`).join('\n\n'), textStyle(20, {
+        this.add.rectangle(width / 2, height / 2, width, height, PALETTE.chat);
+        this.add.text(60, 50, '대본(story 폴더)에 고칠 곳이 있어요', textStyle(26, { weight: 700, color: INK.bad }));
+        this.add.text(60, 110, errors.slice(0, 8).join('\n\n'), textStyle(16, {
             wordWrap: { width: width - 120, useAdvancedWrap: true },
             lineSpacing: 6,
         }));
-        this.add.text(60, height - 50, '고친 다음 저장하고 새로고침(F5 / Cmd+R)하세요.', textStyle(20, { color: COLORS.muted }));
+        this.add.text(60, height - 50, '고친 다음 저장하고 새로고침(F5 / Cmd+R)하세요.', textStyle(15, { color: INK.muted }));
     }
 }
